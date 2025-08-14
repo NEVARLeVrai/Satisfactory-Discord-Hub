@@ -1,4 +1,5 @@
 const { servers } = require('../servers.json');
+const { ActivityType } = require('discord.js'); // U need it
 let richPresenceInterval = null;
 
 const richPresenceHandler = async (client, selectedServer) => {
@@ -27,19 +28,26 @@ const richPresenceHandler = async (client, selectedServer) => {
             const data = await response.json();
             const playerCount = data.data.serverGameState.numConnectedPlayers || 0;
             const maxPlayers = data.data.serverGameState.playerLimit || 0;
+            const sessionName = data.data.serverGameState.activeSessionName || 'Unknown';
 
             console.log(`Fetched player count: ${playerCount}/${maxPlayers}`);
 
-            // Update the bot's rich presence
-            client.user.setActivity(`Online: ${playerCount}/${maxPlayers}`, { type: 'PLAYING' });
-            console.log(`Updated rich presence: ${playerCount}/${maxPlayers} players online`);
+            // Update the bot's rich presence for Discord.js v14
+            if (client.user) {
+                client.user.setActivity(`${sessionName} — ${playerCount}/${maxPlayers} players`, {
+                    type: ActivityType.Watching // playing doesnt work ? idk why
+                });
+                console.log(`Updated rich presence: ${playerCount}/${maxPlayers} players online`);
+            } else {
+                console.warn('client.user not ready yet');
+            }
 
         } catch (error) {
             console.error('Error fetching player count:', error);
         }
     };
 
-    // Clear any existing interval to avoid conflicts
+    // Clear any existing interval
     if (richPresenceInterval) {
         clearInterval(richPresenceInterval);
     }
@@ -48,7 +56,11 @@ const richPresenceHandler = async (client, selectedServer) => {
     richPresenceInterval = setInterval(updatePresence, 30000);
 
     // Initial presence update
-    await updatePresence();
+    if (client.user) {
+        await updatePresence();
+    } else {
+        client.once('ready', updatePresence);
+    }
 };
 
 module.exports = { richPresenceHandler };
